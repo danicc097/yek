@@ -27,7 +27,7 @@ pub mod tree;
 use config::YekConfig;
 use models::ProcessedFile;
 use parallel::process_files_parallel;
-use priority::compute_recentness_boost;
+use priority::{compute_recentness_boost};
 use tree::generate_tree;
 
 // Add a static BPE encoder for reuse
@@ -42,6 +42,10 @@ fn get_tokenizer() -> &'static CoreBPE {
 /// Check if a file is likely text or binary by reading only a small chunk.
 /// This avoids reading large files fully just to detect their type.
 pub fn is_text_file(path: &Path, user_binary_extensions: &[String]) -> io::Result<bool> {
+    if has_shebang(path) {
+        return Ok(true);
+    }
+
     // If extension is known to be binary, skip quickly
     if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
         if user_binary_extensions.iter().any(|bin_ext| bin_ext == ext) {
@@ -57,6 +61,23 @@ pub fn is_text_file(path: &Path, user_binary_extensions: &[String]) -> io::Resul
     buf.truncate(n);
 
     Ok(inspect(&buf) != ContentType::BINARY)
+}
+
+/// Check if a file has a shebang on its first line
+pub fn has_shebang(path: &Path) -> bool {
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        if crate::defaults::BINARY_FILE_EXTENSIONS.contains(&ext) {
+            return false;
+        }
+    }
+    use std::io::Read;
+    if let Ok(mut file) = std::fs::File::open(path) {
+        let mut buf = [0u8; 2];
+        if file.read_exact(&mut buf).is_ok() {
+            return &buf == b"#!" ;
+        }
+    }
+    false
 }
 
 /// Main entrypoint for serialization, used by CLI and tests
@@ -315,3 +336,4 @@ pub fn parse_token_limit(limit: &str) -> anyhow::Result<usize> {
 pub fn count_tokens(text: &str) -> usize {
     get_tokenizer().encode_with_special_tokens(text).len()
 }
+

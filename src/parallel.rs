@@ -191,7 +191,7 @@ impl ParallelFileProcessor {
         // Read and process file content
         match self.context.file_system.read_file(file_path) {
             Ok(content) => {
-                if inspect(&content) == ContentType::BINARY {
+                if inspect(&content) == ContentType::BINARY && !crate::has_shebang(file_path) {
                     debug!("Skipping binary file: {rel_path}");
                     Ok(Vec::new())
                 } else {
@@ -263,6 +263,12 @@ impl ParallelFileProcessor {
             let path = entry.path().to_path_buf();
             let rel_path = self.normalize_path(&path, base_dir);
 
+            // If it has a shebang, bypass gitignore check
+            if crate::has_shebang(&path) {
+                files_to_process.push((path, rel_path));
+                continue;
+            }
+
             // Check gitignore
             if gitignore.matched(&path, false).is_ignore() {
                 debug!("Skipping ignored file: {rel_path}");
@@ -286,7 +292,7 @@ impl ParallelFileProcessor {
         // Read file content
         let content = self.context.file_system.read_file(file_path)?;
 
-        if inspect(&content) == ContentType::BINARY {
+        if inspect(&content) == ContentType::BINARY && !crate::has_shebang(file_path) {
             return Err(anyhow!("Binary file: {}", rel_path));
         }
 
@@ -393,6 +399,11 @@ impl ParallelFileProcessor {
 
     /// Check if a file should be ignored
     fn should_ignore_file(&self, file_path: &Path, _rel_path: &str) -> bool {
+        // Shebang files are never ignored
+        if crate::has_shebang(file_path) {
+            return false;
+        }
+
         // Check ignore patterns
         let path_str = file_path.to_string_lossy();
         let ignored_by_pattern = self
@@ -444,14 +455,9 @@ impl ParallelFileProcessor {
         ))
     }
 
-    /// Normalize path to relative, slash-normalized form
-    fn normalize_path(&self, path: &Path, base: &Path) -> String {
-        path.strip_prefix(base)
-            .unwrap_or(path)
-            .to_path_buf()
-            .to_slash()
-            .unwrap_or_default()
-            .to_string()
+    /// Normalize path relative to base directory
+    fn normalize_path(&self, path: &Path, base_dir: &Path) -> String {
+        normalize_path(path, base_dir)
     }
 }
 

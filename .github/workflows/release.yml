@@ -1,0 +1,72 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    name: Build Binary
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: yek
+            binary_path: target/release/yek
+          - os: windows-latest
+            artifact_name: yek.exe
+            binary_path: target/release/yek.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.binary_path }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Yek Linux
+        uses: actions/download-artifact@v4
+        with:
+          name: yek
+          path: ./
+
+      - name: Download Yek Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: yek.exe
+          path: ./
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: commit-${{ github.sha }}
+          name: "Release Commit ${{ github.sha }}"
+          draft: false
+          prerelease: false
+          files: |
+            yek
+            yek.exe
+          token: ${{ secrets.GITHUB_TOKEN }}
+
