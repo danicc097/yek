@@ -302,9 +302,16 @@ impl ParallelFileProcessor {
         // Get thread-safe file index
         let file_index = self.get_next_file_index(priority);
 
+        let content_str = String::from_utf8_lossy(&content).to_string();
+        let content_str = if self.context.output_config.redact {
+            crate::redact::redact_secrets(&content_str)
+        } else {
+            content_str
+        };
+
         Ok(ProcessedFile::new_with_category(
             rel_path.to_string(),
-            String::from_utf8_lossy(&content).to_string(),
+            content_str,
             priority,
             file_index,
             category,
@@ -446,9 +453,16 @@ impl ParallelFileProcessor {
         let (priority, category) = self.calculate_priority_with_category(rel_path);
         let file_index = self.get_next_file_index(priority);
 
+        let content_str = String::from_utf8_lossy(content).to_string();
+        let content_str = if self.context.output_config.redact {
+            crate::redact::redact_secrets(&content_str)
+        } else {
+            content_str
+        };
+
         Ok(ProcessedFile::new_with_category(
             rel_path.to_string(),
-            String::from_utf8_lossy(content).to_string(),
+            content_str,
             priority,
             file_index,
             category,
@@ -491,7 +505,10 @@ pub fn process_files_parallel(
             max_git_depth: config.max_git_depth,
             git_boost_max: config.git_boost_max,
         },
-        OutputConfig::default(), // TODO: Convert from YekConfig
+        OutputConfig {
+            redact: config.redact,
+            ..OutputConfig::default()
+        },
         ProcessingConfig {
             priority_rules: config.priority_rules.clone(),
             category_weights: config.category_weights.clone().unwrap_or_default(),

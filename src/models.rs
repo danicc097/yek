@@ -263,6 +263,8 @@ pub struct OutputConfig {
     pub output_name: Option<String>,
     /// Whether to stream output to stdout
     pub stream: bool,
+    /// Whether to redact sensitive tokens and passwords
+    pub redact: bool,
 }
 
 impl Default for OutputConfig {
@@ -279,6 +281,7 @@ impl Default for OutputConfig {
             output_dir: None,
             output_name: None,
             stream: false,
+            redact: true,
         }
     }
 }

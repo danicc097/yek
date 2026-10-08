@@ -357,6 +357,12 @@ impl FileDiscoveryStage {
         // Calculate priority
         let priority = self.calculate_priority(&rel_path, repo_info, context);
 
+        let content = if context.output_config.redact {
+            crate::redact::redact_secrets(&content)
+        } else {
+            content
+        };
+
         Ok(ProcessedFile::new(rel_path, content, priority, 0))
     }
 
@@ -714,6 +720,10 @@ impl ProcessingStage for OutputFormattingStage {
 
 impl OutputFormattingStage {
     fn apply_formatting(&self, file: &mut ProcessedFile, context: &ProcessingContext) {
+        if context.output_config.redact {
+            file.content = crate::redact::redact_secrets(&file.content);
+        }
+
         // Apply line numbers if requested
         if context.output_config.line_numbers {
             file.content = self.add_line_numbers(&file.content);

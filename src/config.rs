@@ -98,6 +98,14 @@ pub struct YekConfig {
     #[config_arg(long = "tree-only")]
     pub tree_only: bool,
 
+    /// Disable redacting sensitive tokens, keys, and passwords from output
+    #[config_arg(long = "no-redact")]
+    pub no_redact: bool,
+
+    /// Redact sensitive tokens, keys, and passwords from output (enabled by default)
+    #[config_arg(long = "redact")]
+    pub redact: bool,
+
     /// True if we should stream output to stdout (computed)
     pub stream: bool,
 
@@ -144,6 +152,8 @@ impl Default for YekConfig {
             token_mode: false,
             output_file_full_path: None,
             max_git_depth: 100,
+            no_redact: false,
+            redact: true,
         }
     }
 }
@@ -227,6 +237,11 @@ impl YekConfig {
 
         // 2) compute derived fields:
         cfg.token_mode = !cfg.tokens.is_empty();
+        if cfg.no_redact {
+            cfg.redact = false;
+        } else {
+            cfg.redact = true;
+        }
         let force_tty = std::env::var("FORCE_TTY").is_ok();
 
         cfg.stream = !std::io::stdout().is_terminal() && !force_tty;
@@ -324,6 +339,12 @@ impl YekConfig {
         self.line_numbers |= config_bool(&settings, "line_numbers", "line-numbers");
         self.tree_header |= config_bool(&settings, "tree_header", "tree-header");
         self.tree_only |= config_bool(&settings, "tree_only", "tree-only");
+        self.no_redact |= config_bool(&settings, "no_redact", "no-redact");
+        if let Ok(redact_val) = settings.get_bool("redact") {
+            if !redact_val {
+                self.no_redact = true;
+            }
+        }
     }
 
     /// Compute a quick checksum for the input paths (files and directories).

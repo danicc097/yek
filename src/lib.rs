@@ -21,8 +21,11 @@ pub mod models;
 pub mod parallel;
 pub mod pipeline;
 pub mod priority;
+pub mod redact;
 pub mod repository;
 pub mod tree;
+
+pub use redact::redact_secrets;
 
 use config::YekConfig;
 use models::ProcessedFile;
@@ -209,9 +212,14 @@ pub fn concat_files(files: &[ProcessedFile], config: &YekConfig) -> anyhow::Resu
 
     let mut files_to_include = Vec::new();
     for file in sorted_files {
+        let file_content = if config.redact {
+            crate::redact::redact_secrets(&file.content)
+        } else {
+            file.content.clone()
+        };
         let content_size = if config.token_mode {
             // Format the file content with template first, then count tokens
-            let content = format_content_with_line_numbers(&file.content, config.line_numbers);
+            let content = format_content_with_line_numbers(&file_content, config.line_numbers);
             let formatted = if config.json {
                 serde_json::to_string(&serde_json::json!({
                     "filename": &file.rel_path,
@@ -231,7 +239,7 @@ pub fn concat_files(files: &[ProcessedFile], config: &YekConfig) -> anyhow::Resu
             };
             count_tokens(&formatted)
         } else {
-            let content = format_content_with_line_numbers(&file.content, config.line_numbers);
+            let content = format_content_with_line_numbers(&file_content, config.line_numbers);
             content.len()
         };
 
@@ -249,7 +257,12 @@ pub fn concat_files(files: &[ProcessedFile], config: &YekConfig) -> anyhow::Resu
             &files_to_include
                 .iter()
                 .map(|f| {
-                    let content = format_content_with_line_numbers(&f.content, config.line_numbers);
+                    let file_content = if config.redact {
+                        crate::redact::redact_secrets(&f.content)
+                    } else {
+                        f.content.clone()
+                    };
+                    let content = format_content_with_line_numbers(&file_content, config.line_numbers);
                     serde_json::json!({
                         "filename": &f.rel_path,
                         "content": content,
@@ -262,7 +275,12 @@ pub fn concat_files(files: &[ProcessedFile], config: &YekConfig) -> anyhow::Resu
         files_to_include
             .iter()
             .map(|f| {
-                let content = format_content_with_line_numbers(&f.content, config.line_numbers);
+                let file_content = if config.redact {
+                    crate::redact::redact_secrets(&f.content)
+                } else {
+                    f.content.clone()
+                };
+                let content = format_content_with_line_numbers(&file_content, config.line_numbers);
                 config
                     .output_template
                     .as_ref()
