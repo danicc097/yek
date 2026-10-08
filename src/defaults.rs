@@ -98,6 +98,8 @@ pub const BINARY_FILE_EXTENSIONS: &[&str] = &[
 pub const DEFAULT_IGNORE_PATTERNS: &[&str] = &[
     "LICENSE",
     ".git/**",
+    ".git",
+    ".cache/**",
     ".next/**",
     "node_modules/**",
     "vendor/**",

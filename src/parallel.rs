@@ -244,6 +244,11 @@ impl ParallelFileProcessor {
         walk_builder
             .follow_links(false)
             .standard_filters(true)
+            .hidden(false)
+            .filter_entry(|entry| {
+                entry.depth() == 0
+                    || (entry.file_name() != ".git" && entry.file_name() != ".gitignore")
+            })
             .require_git(false);
 
         let gitignore = Arc::clone(gitignore);
@@ -507,3 +512,4 @@ pub fn process_files_parallel(
 
     processor.process_files_parallel(base_path)
 }
+

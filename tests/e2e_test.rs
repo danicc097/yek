@@ -333,11 +333,51 @@ mod e2e_tests {
     fn test_hidden_files_included() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempdir()?;
         fs::write(temp_dir.path().join(".hidden.txt"), "Hidden content")?;
+        let config_dir = temp_dir.path().join(".config");
+        fs::create_dir(&config_dir)?;
+        fs::write(config_dir.join("test.txt"), "Config content")?;
 
-        Command::cargo_bin("yek")?
+        let output = Command::cargo_bin("yek")?
             .arg(temp_dir.path())
-            .assert()
-            .success();
+            .output()?;
+
+        assert!(output.status.success());
+        let stdout = String::from_utf8(output.stdout)?;
+        assert!(
+            stdout.contains("Hidden content"),
+            "Output should contain .hidden.txt content"
+        );
+        assert!(
+            stdout.contains("Config content"),
+            "Output should contain .config/test.txt content"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_ignore_patterns_hidden_directory() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = tempdir()?;
+        let config_dir = temp_dir.path().join(".config");
+        fs::create_dir(&config_dir)?;
+        fs::write(config_dir.join("test.txt"), "Config content")?;
+        fs::write(temp_dir.path().join("main.rs"), "fn main() {}")?;
+
+        let output = Command::cargo_bin("yek")?
+            .arg(temp_dir.path())
+            .arg("--ignore-patterns")
+            .arg(".config/**")
+            .output()?;
+
+        assert!(output.status.success());
+        let stdout = String::from_utf8(output.stdout)?;
+        assert!(
+            !stdout.contains("Config content"),
+            "Output should not contain ignored .config content"
+        );
+        assert!(
+            stdout.contains("fn main()"),
+            "Output should contain main.rs content"
+        );
         Ok(())
     }
 
@@ -487,3 +527,4 @@ mod e2e_tests {
         Ok(())
     }
 }
+
