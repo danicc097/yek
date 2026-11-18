@@ -278,3 +278,25 @@ fn test_serialize_repo_with_peek_and_cli_flag() {
     assert!(!stdout.contains("secret_body"));
     assert!(stdout.contains("[truncated...]"));
 }
+
+#[test]
+fn test_peek_multibyte_utf8() {
+    let go_code = r#"package main
+
+func render() {
+	label("✕  Quit "+title)
+}
+"#;
+    let go_out = peek_file("main.go", go_code);
+    assert!(go_out.contains("func render()"));
+
+    let cpp_code = r#"
+namespace app {
+void render() {
+    button("✕ Remove");
+}
+}
+"#;
+    let cpp_out = peek_file("main.cpp", cpp_code);
+    assert!(cpp_out.contains("void render();"));
+}

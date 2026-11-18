@@ -333,19 +333,17 @@ fn tokenize_cpp(code: &str) -> Vec<CppToken<'_>> {
         }
 
         // Multi-char symbols (note: keep '<' and '>' single-char for templates)
-        if i + 1 < len {
-            let two = &code[i..i + 2];
-            if matches!(
-                two,
-                "::" | "->" | "<=" | ">=" | "==" | "!=" | "&&" | "||" | "++" | "--"
-            ) {
-                tokens.push(CppToken {
-                    kind: CppTokenKind::Symbol,
-                    text: two,
-                });
-                i += 2;
-                continue;
-            }
+        let rem = &code[i..];
+        if let Some(op) = ["::", "->", "<=", ">=", "==", "!=", "&&", "||", "++", "--"]
+            .iter()
+            .find(|&&op| rem.starts_with(op))
+        {
+            tokens.push(CppToken {
+                kind: CppTokenKind::Symbol,
+                text: op,
+            });
+            i += 2;
+            continue;
         }
 
         let sym_end = i + ch.len_utf8();
@@ -1113,7 +1111,8 @@ fn tokenize_go(code: &str) -> Vec<GoToken<'_>> {
         }
 
         // Multi-char Go operators that are cleaner unsplit
-        if i + 2 < len && &code[i..i + 3] == "..." {
+        let rem = &code[i..];
+        if rem.starts_with("...") {
             tokens.push(GoToken {
                 kind: GoTokenKind::Punct,
                 text: "...",
@@ -1121,16 +1120,16 @@ fn tokenize_go(code: &str) -> Vec<GoToken<'_>> {
             i += 3;
             continue;
         }
-        if i + 1 < len {
-            let two = &code[i..i + 2];
-            if matches!(two, "<-" | ":=" | "==" | "!=" | "<=" | ">=" | "&&" | "||") {
-                tokens.push(GoToken {
-                    kind: GoTokenKind::Punct,
-                    text: two,
-                });
-                i += 2;
-                continue;
-            }
+        if let Some(op) = ["<-", ":=", "==", "!=", "<=", ">=", "&&", "||"]
+            .iter()
+            .find(|&&op| rem.starts_with(op))
+        {
+            tokens.push(GoToken {
+                kind: GoTokenKind::Punct,
+                text: op,
+            });
+            i += 2;
+            continue;
         }
 
         let end = i + ch.len_utf8();
