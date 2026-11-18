@@ -254,6 +254,12 @@ fn test_serialize_repo_with_peek_and_cli_flag() {
         .join("\n");
     fs::write(dir.path().join("data.json"), &big_json).unwrap();
 
+    fs::write(
+        dir.path().join("short.json"),
+        "{\n  \"hello\": \"world\"\n}\n",
+    )
+    .unwrap();
+
     let mut cfg = YekConfig::default();
     cfg.input_paths = vec![dir.path().to_string_lossy().to_string()];
     cfg.peek = true;
@@ -264,6 +270,12 @@ fn test_serialize_repo_with_peek_and_cli_flag() {
     assert!(output.contains("keep full text file content"));
     assert!(output.contains("[truncated...]"));
     assert!(!output.contains("line_25"));
+    assert!(output.contains(">>>> main.go (peek)"));
+    assert!(output.contains(">>>> data.json (peek)"));
+    assert!(output.contains(">>>> notes.txt"));
+    assert!(!output.contains(">>>> notes.txt (peek)"));
+    assert!(output.contains(">>>> short.json"));
+    assert!(!output.contains(">>>> short.json (peek)"));
 
     // Also verify the --peek CLI flag end-to-end
     let cmd_out = Command::cargo_bin("yek")
@@ -277,4 +289,32 @@ fn test_serialize_repo_with_peek_and_cli_flag() {
     assert!(stdout.contains("func hello() string"));
     assert!(!stdout.contains("secret_body"));
     assert!(stdout.contains("[truncated...]"));
+    assert!(stdout.contains(">>>> main.go (peek)"));
+    assert!(stdout.contains(">>>> data.json (peek)"));
+    assert!(stdout.contains(">>>> notes.txt"));
+    assert!(!stdout.contains(">>>> notes.txt (peek)"));
+    assert!(stdout.contains(">>>> short.json"));
+    assert!(!stdout.contains(">>>> short.json (peek)"));
+}
+
+#[test]
+fn test_peek_multibyte_utf8() {
+    let go_code = r#"package main
+
+func render() {
+	label("✕  Quit "+title)
+}
+"#;
+    let go_out = peek_file("main.go", go_code);
+    assert!(go_out.contains("func render()"));
+
+    let cpp_code = r#"
+namespace app {
+void render() {
+    button("✕ Remove");
+}
+}
+"#;
+    let cpp_out = peek_file("main.cpp", cpp_code);
+    assert!(cpp_out.contains("void render();"));
 }

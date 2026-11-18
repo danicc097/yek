@@ -357,13 +357,15 @@ impl FileDiscoveryStage {
         // Calculate priority
         let priority = self.calculate_priority(&rel_path, repo_info, context);
 
-        let final_content = if context.output_config.peek {
-            crate::peek::peek_file(&rel_path, &content)
+        let (final_content, is_trimmed) = if context.output_config.peek {
+            crate::peek::peek_file_with_status(&rel_path, &content)
         } else {
-            content
+            (content, false)
         };
 
-        Ok(ProcessedFile::new(rel_path, final_content, priority, 0))
+        let mut file = ProcessedFile::new(rel_path, final_content, priority, 0);
+        file.is_trimmed = is_trimmed;
+        Ok(file)
     }
 
     fn should_ignore_file(&self, path: &Path, context: &ProcessingContext) -> bool {

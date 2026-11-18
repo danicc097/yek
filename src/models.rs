@@ -24,6 +24,9 @@ pub struct ProcessedFile {
     pub formatted_content: Option<String>,
     /// File category for improved sorting and organization
     pub category: FileCategory,
+    /// Whether peek trimmed this file
+    #[serde(default)]
+    pub is_trimmed: bool,
 }
 
 impl Clone for ProcessedFile {
@@ -37,6 +40,7 @@ impl Clone for ProcessedFile {
             token_count: OnceLock::new(),
             formatted_content: self.formatted_content.clone(),
             category: self.category,
+            is_trimmed: self.is_trimmed,
         }
     }
 }
@@ -55,6 +59,7 @@ impl ProcessedFile {
             token_count: OnceLock::new(),
             formatted_content: None,
             category,
+            is_trimmed: false,
         }
     }
 
@@ -76,6 +81,7 @@ impl ProcessedFile {
             token_count: OnceLock::new(),
             formatted_content: None,
             category,
+            is_trimmed: false,
         }
     }
 

@@ -220,11 +220,16 @@ pub fn concat_files(files: &[ProcessedFile], config: &YekConfig) -> anyhow::Resu
                 }))
                 .map_err(|e| anyhow!("Failed to serialize JSON: {}", e))?
             } else {
+                let file_path = if config.peek && file.is_trimmed {
+                    format!("{} (peek)", file.rel_path)
+                } else {
+                    file.rel_path.clone()
+                };
                 config
                     .output_template
                     .as_ref()
                     .expect("output_template should be set")
-                    .replace("FILE_PATH", &file.rel_path)
+                    .replace("FILE_PATH", &file_path)
                     .replace("FILE_CONTENT", &content)
                     // Handle both literal "\n" and escaped "\\n"
                     .replace("\\\\\n", "\n") // First handle escaped newline
@@ -264,11 +269,16 @@ pub fn concat_files(files: &[ProcessedFile], config: &YekConfig) -> anyhow::Resu
             .iter()
             .map(|f| {
                 let content = format_content_with_line_numbers(&f.content, config.line_numbers);
+                let file_path = if config.peek && f.is_trimmed {
+                    format!("{} (peek)", f.rel_path)
+                } else {
+                    f.rel_path.clone()
+                };
                 config
                     .output_template
                     .as_ref()
                     .expect("output_template should be set")
-                    .replace("FILE_PATH", &f.rel_path)
+                    .replace("FILE_PATH", &file_path)
                     .replace("FILE_CONTENT", &content)
                     // Handle both literal "\n" and escaped "\\n"
                     .replace("\\\\\n", "\n") // First handle escaped newline

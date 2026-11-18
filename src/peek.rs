@@ -12,6 +12,10 @@ const JSON_PEEK_LINES: usize = 20;
 ///
 /// Unsupported extensions are returned unchanged.
 pub fn peek_file(rel_path: &str, content: &str) -> String {
+    peek_file_with_status(rel_path, content).0
+}
+
+pub fn peek_file_with_status(rel_path: &str, content: &str) -> (String, bool) {
     let ext = Path::new(rel_path)
         .extension()
         .and_then(|e| e.to_str())
@@ -22,20 +26,32 @@ pub fn peek_file(rel_path: &str, content: &str) -> String {
         Some(
             "c" | "cc" | "cpp" | "cxx" | "c++" | "h" | "hh" | "hpp" | "hxx" | "h++" | "inl"
             | "ipp",
-        ) => peek_cpp(content),
-        Some("go") => peek_go(content),
-        Some("py" | "pyi") => peek_python(content),
-        _ => content.to_string(),
+        ) => {
+            let res = peek_cpp(content);
+            let trimmed = res.trim() != content.trim();
+            (res, trimmed)
+        }
+        Some("go") => {
+            let res = peek_go(content);
+            let trimmed = res.trim() != content.trim();
+            (res, trimmed)
+        }
+        Some("py" | "pyi") => {
+            let res = peek_python(content);
+            let trimmed = res.trim() != content.trim();
+            (res, trimmed)
+        }
+        _ => (content.to_string(), false),
     }
 }
 
-fn peek_json(content: &str) -> String {
+fn peek_json(content: &str) -> (String, bool) {
     let mut lines = content.lines();
     let head: Vec<&str> = lines.by_ref().take(JSON_PEEK_LINES).collect();
     if lines.next().is_some() {
-        format!("{}\n[truncated...]", head.join("\n"))
+        (format!("{}\n[truncated...]", head.join("\n")), true)
     } else {
-        content.to_string()
+        (content.to_string(), false)
     }
 }
 
@@ -333,19 +349,17 @@ fn tokenize_cpp(code: &str) -> Vec<CppToken<'_>> {
         }
 
         // Multi-char symbols (note: keep '<' and '>' single-char for templates)
-        if i + 1 < len {
-            let two = &code[i..i + 2];
-            if matches!(
-                two,
-                "::" | "->" | "<=" | ">=" | "==" | "!=" | "&&" | "||" | "++" | "--"
-            ) {
-                tokens.push(CppToken {
-                    kind: CppTokenKind::Symbol,
-                    text: two,
-                });
-                i += 2;
-                continue;
-            }
+        let rem = &code[i..];
+        if let Some(op) = ["::", "->", "<=", ">=", "==", "!=", "&&", "||", "++", "--"]
+            .iter()
+            .find(|&&op| rem.starts_with(op))
+        {
+            tokens.push(CppToken {
+                kind: CppTokenKind::Symbol,
+                text: op,
+            });
+            i += 2;
+            continue;
         }
 
         let sym_end = i + ch.len_utf8();
@@ -451,14 +465,12 @@ fn append_cpp_token(statement: &mut Vec<String>, value: &str) {
             || prev == "["
             || prev == "~"
             || prev == "!";
-        if prev == ">" && (is_word_char(first) || value == "{") {
-            statement.push(" ".to_string());
-        } else if prev == "template" && value == "<" {
+        if (prev == ">" && (is_word_char(first) || value == "{"))
+            || (prev == "template" && value == "<")
+        {
             statement.push(" ".to_string());
         } else if !no_space {
-            if value == "=" || prev == "=" || value == ":" || prev == ":" {
-                statement.push(" ".to_string());
-            } else if prev == "," {
+            if value == "=" || prev == "=" || value == ":" || prev == ":" || prev == "," {
                 statement.push(" ".to_string());
             } else if is_word_char(first) {
                 if is_word_char(last) || matches!(last, ')' | '>' | ']' | '*' | '&') {
@@ -515,17 +527,15 @@ fn cpp_statement_type_kind(statement: &[String]) -> Option<CppScopeKind> {
             "->" if paren_depth == 0 && angle_depth == 0 && has_paren_at_zero => {
                 saw_arrow_after_paren = true;
             }
-            _ if paren_depth == 0 && angle_depth == 0 => {
-                if found_kind.is_none() {
-                    match tok {
-                        "enum" => found_kind = Some(CppScopeKind::Enum),
-                        "namespace" => found_kind = Some(CppScopeKind::Namespace),
-                        "class" | "struct" | "union" => found_kind = Some(CppScopeKind::Type),
-                        _ if prev_non_space == "extern" && tok.starts_with('"') => {
-                            found_kind = Some(CppScopeKind::Namespace);
-                        }
-                        _ => {}
+            _ if paren_depth == 0 && angle_depth == 0 && found_kind.is_none() => {
+                match tok {
+                    "enum" => found_kind = Some(CppScopeKind::Enum),
+                    "namespace" => found_kind = Some(CppScopeKind::Namespace),
+                    "class" | "struct" | "union" => found_kind = Some(CppScopeKind::Type),
+                    _ if prev_non_space == "extern" && tok.starts_with('"') => {
+                        found_kind = Some(CppScopeKind::Namespace);
                     }
+                    _ => {}
                 }
             }
             _ => {}
@@ -1113,7 +1123,8 @@ fn tokenize_go(code: &str) -> Vec<GoToken<'_>> {
         }
 
         // Multi-char Go operators that are cleaner unsplit
-        if i + 2 < len && &code[i..i + 3] == "..." {
+        let rem = &code[i..];
+        if rem.starts_with("...") {
             tokens.push(GoToken {
                 kind: GoTokenKind::Punct,
                 text: "...",
@@ -1121,16 +1132,16 @@ fn tokenize_go(code: &str) -> Vec<GoToken<'_>> {
             i += 3;
             continue;
         }
-        if i + 1 < len {
-            let two = &code[i..i + 2];
-            if matches!(two, "<-" | ":=" | "==" | "!=" | "<=" | ">=" | "&&" | "||") {
-                tokens.push(GoToken {
-                    kind: GoTokenKind::Punct,
-                    text: two,
-                });
-                i += 2;
-                continue;
-            }
+        if let Some(op) = ["<-", ":=", "==", "!=", "<=", ">=", "&&", "||"]
+            .iter()
+            .find(|&&op| rem.starts_with(op))
+        {
+            tokens.push(GoToken {
+                kind: GoTokenKind::Punct,
+                text: op,
+            });
+            i += 2;
+            continue;
         }
 
         let end = i + ch.len_utf8();
@@ -1162,44 +1173,31 @@ fn append_go_token(
             let need_space = if tok.kind == GoTokenKind::Comment {
                 true
             } else if tok.text == "{" {
-                if next.map(|n| n.text) == Some("}") {
-                    false
-                } else if matches!(p.text, "]" | ")") {
+                if next.map(|n| n.text) == Some("}") || matches!(p.text, "]" | ")") {
                     false
                 } else {
                     p.text == "struct" || p.text == "interface"
                 }
-            } else if p.text == "," || p.text == ";" {
-                true
-            } else if matches!(p.text, "func" | "type" | "package" | "var" | "const" | "chan")
-                && tok.text != "("
-                && tok.text != "["
-            {
-                true
-            } else if p.text == "func" && tok.text == "(" {
-                true
-            } else if p.text == ")"
-                && (tok.kind == GoTokenKind::Word
-                    || matches!(tok.text, "(" | "*" | "[" | "<-" | "{"))
-            {
-                true
-            } else if p.text == "]" && matches!(tok.text, "struct" | "interface") {
-                true
-            } else if p.text == "}" && (tok.kind == GoTokenKind::Word || tok.text == "{") {
-                true
-            } else if matches!(tok.text, "=" | ":=" | "<-")
+            } else if p.text == ","
+                || p.text == ";"
+                || (matches!(p.text, "func" | "type" | "package" | "var" | "const" | "chan")
+                    && tok.text != "("
+                    && tok.text != "[")
+                || (p.text == "func" && tok.text == "(")
+                || (p.text == ")"
+                    && (tok.kind == GoTokenKind::Word
+                        || matches!(tok.text, "(" | "*" | "[" | "<-" | "{")))
+                || (p.text == "]" && matches!(tok.text, "struct" | "interface"))
+                || (p.text == "}" && (tok.kind == GoTokenKind::Word || tok.text == "{"))
+                || matches!(tok.text, "=" | ":=" | "<-")
                 || matches!(p.text, "=" | ":=" | "<-")
+                || (p.kind == GoTokenKind::Word && tok.kind == GoTokenKind::Word)
+                || (tok.kind == GoTokenKind::String
+                    && (p.kind == GoTokenKind::Word
+                        || p.kind == GoTokenKind::String
+                        || matches!(p.text, "]" | "}" | ")" | ">")))
+                || (p.kind == GoTokenKind::String && tok.kind == GoTokenKind::Word)
             {
-                true
-            } else if p.kind == GoTokenKind::Word && tok.kind == GoTokenKind::Word {
-                true
-            } else if tok.kind == GoTokenKind::String
-                && (p.kind == GoTokenKind::Word
-                    || p.kind == GoTokenKind::String
-                    || matches!(p.text, "]" | "}" | ")" | ">"))
-            {
-                true
-            } else if p.kind == GoTokenKind::String && tok.kind == GoTokenKind::Word {
                 true
             } else {
                 p.kind == GoTokenKind::Word

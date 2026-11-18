@@ -308,19 +308,21 @@ impl ParallelFileProcessor {
         let file_index = self.get_next_file_index(priority);
 
         let raw_content = String::from_utf8_lossy(&content);
-        let final_content = if self.context.output_config.peek {
-            crate::peek::peek_file(rel_path, &raw_content)
+        let (final_content, is_trimmed) = if self.context.output_config.peek {
+            crate::peek::peek_file_with_status(rel_path, &raw_content)
         } else {
-            raw_content.into_owned()
+            (raw_content.into_owned(), false)
         };
 
-        Ok(ProcessedFile::new_with_category(
+        let mut file = ProcessedFile::new_with_category(
             rel_path.to_string(),
             final_content,
             priority,
             file_index,
             category,
-        ))
+        );
+        file.is_trimmed = is_trimmed;
+        Ok(file)
     }
 
     /// Calculate priority for a file (legacy method for backward compatibility)
@@ -459,19 +461,21 @@ impl ParallelFileProcessor {
         let file_index = self.get_next_file_index(priority);
 
         let raw_content = String::from_utf8_lossy(content);
-        let final_content = if self.context.output_config.peek {
-            crate::peek::peek_file(rel_path, &raw_content)
+        let (final_content, is_trimmed) = if self.context.output_config.peek {
+            crate::peek::peek_file_with_status(rel_path, &raw_content)
         } else {
-            raw_content.into_owned()
+            (raw_content.into_owned(), false)
         };
 
-        Ok(ProcessedFile::new_with_category(
+        let mut file = ProcessedFile::new_with_category(
             rel_path.to_string(),
             final_content,
             priority,
             file_index,
             category,
-        ))
+        );
+        file.is_trimmed = is_trimmed;
+        Ok(file)
     }
 
     /// Normalize path relative to base directory
