@@ -257,6 +257,8 @@ pub struct OutputConfig {
     pub tree_header: bool,
     /// Whether to show only tree (no content)
     pub tree_only: bool,
+    /// Whether to extract only signatures/interfaces (--peek)
+    pub peek: bool,
     /// Output directory (if not streaming)
     pub output_dir: Option<String>,
     /// Output filename (if not streaming)
@@ -276,6 +278,7 @@ impl Default for OutputConfig {
             json_output: false,
             tree_header: false,
             tree_only: false,
+            peek: false,
             output_dir: None,
             output_name: None,
             stream: false,

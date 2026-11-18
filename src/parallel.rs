@@ -307,9 +307,16 @@ impl ParallelFileProcessor {
         // Get thread-safe file index
         let file_index = self.get_next_file_index(priority);
 
+        let raw_content = String::from_utf8_lossy(&content);
+        let final_content = if self.context.output_config.peek {
+            crate::peek::peek_file(rel_path, &raw_content)
+        } else {
+            raw_content.into_owned()
+        };
+
         Ok(ProcessedFile::new_with_category(
             rel_path.to_string(),
-            String::from_utf8_lossy(&content).to_string(),
+            final_content,
             priority,
             file_index,
             category,
@@ -451,9 +458,16 @@ impl ParallelFileProcessor {
         let (priority, category) = self.calculate_priority_with_category(rel_path);
         let file_index = self.get_next_file_index(priority);
 
+        let raw_content = String::from_utf8_lossy(content);
+        let final_content = if self.context.output_config.peek {
+            crate::peek::peek_file(rel_path, &raw_content)
+        } else {
+            raw_content.into_owned()
+        };
+
         Ok(ProcessedFile::new_with_category(
             rel_path.to_string(),
-            String::from_utf8_lossy(content).to_string(),
+            final_content,
             priority,
             file_index,
             category,
@@ -496,7 +510,10 @@ pub fn process_files_parallel(
             max_git_depth: config.max_git_depth,
             git_boost_max: config.git_boost_max,
         },
-        OutputConfig::default(), // TODO: Convert from YekConfig
+        OutputConfig {
+            peek: config.peek,
+            ..OutputConfig::default()
+        },
         ProcessingConfig {
             priority_rules: config.priority_rules.clone(),
             category_weights: config.category_weights.clone().unwrap_or_default(),

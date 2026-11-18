@@ -357,7 +357,13 @@ impl FileDiscoveryStage {
         // Calculate priority
         let priority = self.calculate_priority(&rel_path, repo_info, context);
 
-        Ok(ProcessedFile::new(rel_path, content, priority, 0))
+        let final_content = if context.output_config.peek {
+            crate::peek::peek_file(&rel_path, &content)
+        } else {
+            content
+        };
+
+        Ok(ProcessedFile::new(rel_path, final_content, priority, 0))
     }
 
     fn should_ignore_file(&self, path: &Path, context: &ProcessingContext) -> bool {

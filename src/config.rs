@@ -98,6 +98,10 @@ pub struct YekConfig {
     #[config_arg(long = "tree-only")]
     pub tree_only: bool,
 
+    /// Extract only signatures/interfaces for C++, Go, Python, and truncate JSON files
+    #[config_arg(long = "peek")]
+    pub peek: bool,
+
     /// True if we should stream output to stdout (computed)
     pub stream: bool,
 
@@ -140,6 +144,7 @@ impl Default for YekConfig {
             // computed fields
             tree_header: false,
             tree_only: false,
+            peek: false,
             stream: false,
             token_mode: false,
             output_file_full_path: None,
@@ -324,6 +329,7 @@ impl YekConfig {
         self.line_numbers |= config_bool(&settings, "line_numbers", "line-numbers");
         self.tree_header |= config_bool(&settings, "tree_header", "tree-header");
         self.tree_only |= config_bool(&settings, "tree_only", "tree-only");
+        self.peek |= config_bool(&settings, "peek", "peek");
     }
 
     /// Compute a quick checksum for the input paths (files and directories).
@@ -716,14 +722,21 @@ mod bool_config_tests {
         let path = dir.path().join("yek.yaml");
         fs::write(
             &path,
-            "json: true\ndebug: true\nline_numbers: true\ntree-header: true\ntree_only: true\n",
+            "json: true\ndebug: true\nline_numbers: true\ntree-header: true\ntree_only: true\npeek: true\n",
         )
         .unwrap();
 
         let mut cfg = YekConfig::default();
         cfg.apply_config_bool_overrides(Some(&path));
 
-        assert!(cfg.json && cfg.debug && cfg.line_numbers && cfg.tree_header && cfg.tree_only);
+        assert!(
+            cfg.json
+                && cfg.debug
+                && cfg.line_numbers
+                && cfg.tree_header
+                && cfg.tree_only
+                && cfg.peek
+        );
     }
 
     #[test]
@@ -736,6 +749,13 @@ mod bool_config_tests {
         cfg.apply_config_bool_overrides(None);
         cfg.apply_config_bool_overrides(Some(&path));
 
-        assert!(!cfg.json && !cfg.debug && !cfg.line_numbers && !cfg.tree_header && !cfg.tree_only);
+        assert!(
+            !cfg.json
+                && !cfg.debug
+                && !cfg.line_numbers
+                && !cfg.tree_header
+                && !cfg.tree_only
+                && !cfg.peek
+        );
     }
 }

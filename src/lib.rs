@@ -19,6 +19,7 @@ pub mod defaults;
 pub mod error;
 pub mod models;
 pub mod parallel;
+pub mod peek;
 pub mod pipeline;
 pub mod priority;
 pub mod repository;
